@@ -48,6 +48,16 @@ def test_exit_1_on_missing_tag(monkeypatch, tmp_path, capsys):
     assert "MISSING_TAG" in capsys.readouterr().out
 
 
+def test_exit_1_when_deep_check_inconclusive(monkeypatch, tmp_path, capsys):
+    # --deep with no sdist published: unverifiable, must not exit 0.
+    patch_network(monkeypatch, CLEAN_INFO, CLEAN_TAGS)
+    args = base_args(monkeypatch, tmp_path) + ["--deep"]
+    assert main(args) == 1
+    out = capsys.readouterr().out
+    assert "NO_SDIST" in out
+    assert "unverifiable" in out
+
+
 def test_exit_2_on_pypi_failure(monkeypatch, tmp_path, capsys):
     patch_network(monkeypatch, CLEAN_INFO, CLEAN_TAGS, fail="pypi")
     assert main(base_args(monkeypatch, tmp_path)) == 2
