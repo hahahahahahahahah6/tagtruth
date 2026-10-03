@@ -13,8 +13,12 @@ MISSING_TAG = "MISSING_TAG"
 SDIST_MISMATCH = "SDIST_MISMATCH"  # PyPI version != sdist PKG-INFO Version
 TAG_SDIST_MISMATCH = "TAG_SDIST_MISMATCH"  # tag name != sdist PKG-INFO Version
 NO_SDIST = "NO_SDIST"  # deep check requested but no sdist published
+CHECK_FAILED = "CHECK_FAILED"  # sdist existed but download/inspection failed
 
 MISMATCH_VERDICTS = {MISSING_TAG, SDIST_MISMATCH, TAG_SDIST_MISMATCH}
+# The deep check could not be completed at all. This is deliberately NOT a
+# clean bill of health: an unverified version must never exit 0.
+INCONCLUSIVE_VERDICTS = {NO_SDIST, CHECK_FAILED}
 
 
 @dataclass
@@ -34,6 +38,10 @@ class DeepChecker:
     Version against the PyPI version and the tag name. A future version can
     additionally fetch the tag's commit content (e.g. version.py) and compare
     that too -- the hook is here on purpose.
+
+    If the sdist cannot be obtained or inspected, the check is INCONCLUSIVE
+    (NO_SDIST / CHECK_FAILED) -- never OK. An unverified version must not
+    look like a verified one.
     """
 
     def __init__(self, get):
@@ -42,12 +50,13 @@ class DeepChecker:
     def check(self, check: Check, sdist_url: str | None) -> None:
         if not sdist_url:
             check.verdict = NO_SDIST
-            check.detail = "no sdist published for this version"
+            check.detail = "no sdist published for this version; deep check impossible"
             return
         try:
             pkg_version = sdist_pkg_info_version(sdist_url, get=self._get)
         except Exception as exc:  # noqa: BLE001 - surfaced as detail, not crash
-            check.verdict = NO_SDIST
+            # A failed inspection is a failed check, never a pass.
+            check.verdict = CHECK_FAILED
             check.detail = f"could not inspect sdist: {exc}"
             return
         check.sdist_version = pkg_version
@@ -121,3 +130,15 @@ def check_package(
 
 def has_mismatches(results: list[Check]) -> bool:
     return any(c.verdict in MISMATCH_VERDICTS for c in results)
+
+
+def has_problems(results: list[Check]) -> bool:
+    """True when anything needs attention: a mismatch OR an unverifiable check.
+
+    An inconclusive deep check (NO_SDIST / CHECK_FAILED) is a problem, not a
+    pass — "could not verify" must never be reported as clean.
+    """
+    return any(
+        c.verdict in MISMATCH_VERDICTS or c.verdict in INCONCLUSIVE_VERDICTS
+        for c in results
+    )
