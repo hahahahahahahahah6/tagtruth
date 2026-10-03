@@ -6,13 +6,15 @@
 
 **Your PyPI package says 1.36.1. The Git tag says 1.36.0.**
 
-Real case: [`google-adk==1.36.0`](https://github.com/google/adk-python/issues/6330)
-exists on PyPI, but there is **no** GitHub release or tag for v1.36.0 —
+Real case (June–July 2026, since fixed upstream): [`google-adk==1.36.0`](https://github.com/google/adk-python/issues/6330)
+was on PyPI while GitHub had **no** release or tag for v1.36.0 —
 [`releases/tag/v1.36.0`](https://github.com/google/adk-python/releases/tag/v1.36.0)
-returns 404 and `git ls-remote --tags` shows only v1.36.1. Worse, the v1.36.1
-tag points at a commit whose `version.py` still says `__version__ = "1.36.0"`
-while the PyPI 1.36.1 sdist says `1.36.1`. The tag doesn't even match the code
-that shipped.
+returned 404 and `git ls-remote --tags` showed only v1.36.1. Worse, the v1.36.1
+tag pointed at a commit whose `version.py` still said `__version__ = "1.36.0"`
+while the PyPI 1.36.1 sdist said `1.36.1`. The tag didn't even match the code
+that shipped. (The maintainer has since created the missing release; the
+incident below is preserved as a historical example — tagtruth's test suite
+replays it from pinned fixtures.)
 
 tagtruth checks that a package's published PyPI versions actually correspond to
 tags in its GitHub repo — the release-integrity question nobody's CI asks.
