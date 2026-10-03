@@ -6,7 +6,13 @@ import json
 import sys
 
 from . import __version__
-from .checker import MISMATCH_VERDICTS, Check, check_package, has_mismatches
+from .checker import (
+    INCONCLUSIVE_VERDICTS,
+    MISMATCH_VERDICTS,
+    Check,
+    check_package,
+    has_problems,
+)
 from .config import (
     find_default_config,
     load_config_file,
@@ -113,15 +119,19 @@ def format_text(results: list[Check]) -> str:
         if i == 0:
             lines.append("  ".join("-" * w for w in widths))
     mismatches = sum(1 for c in results if c.verdict in MISMATCH_VERDICTS)
+    inconclusive = sum(1 for c in results if c.verdict in INCONCLUSIVE_VERDICTS)
     lines.append("")
-    lines.append(
-        f"checked {len(results)} versions, {mismatches} mismatch(es)"
-        + ("" if mismatches == 0 else ": " + ", ".join(
-            f"{c.version} ({c.verdict})"
-            for c in results
-            if c.verdict in MISMATCH_VERDICTS
-        ))
-    )
+    summary = f"checked {len(results)} versions, {mismatches} mismatch(es)"
+    if inconclusive:
+        summary += f", {inconclusive} unverifiable"
+    problems = [
+        f"{c.version} ({c.verdict})"
+        for c in results
+        if c.verdict in MISMATCH_VERDICTS or c.verdict in INCONCLUSIVE_VERDICTS
+    ]
+    if problems:
+        summary += ": " + ", ".join(problems)
+    lines.append(summary)
     return "\n".join(lines)
 
 
@@ -166,7 +176,7 @@ def cmd_check(args: argparse.Namespace) -> int:
         print(json.dumps([check_to_dict(c) for c in results], indent=2))
     else:
         print(format_text(results))
-    return 1 if has_mismatches(results) else 0
+    return 1 if has_problems(results) else 0
 
 
 def main(argv: list[str] | None = None) -> int:
