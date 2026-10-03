@@ -11,6 +11,7 @@ import tarfile
 import zipfile
 
 from tagtruth.checker import (
+    CHECK_FAILED,
     IGNORED,
     MISSING_TAG,
     NO_SDIST,
@@ -20,6 +21,7 @@ from tagtruth.checker import (
     check_package,
     expected_tags_for,
     has_mismatches,
+    has_problems,
 )
 
 FIX = os.path.join(os.path.dirname(__file__), "fixtures")
@@ -151,10 +153,24 @@ def test_deep_tag_name_vs_sdist_mismatch():
     assert results[0].verdict == TAG_SDIST_MISMATCH
 
 
-def test_deep_without_sdist_is_not_mismatch():
+def test_deep_without_sdist_is_inconclusive_not_clean():
     results = check_package(["2.0"], {"v2.0"}, deep=True, sdist_url={}, get=lambda *a, **k: (b"", {}))
     assert results[0].verdict == NO_SDIST
     assert not has_mismatches(results)
+    # An unverifiable check is a problem, never a pass (exit 1, not 0).
+    assert has_problems(results)
+
+
+def test_deep_sdist_inspection_failure_is_check_failed():
+    def boom(*a, **k):
+        raise OSError("network down")
+    results = check_package(
+        ["2.0"], {"v2.0"}, deep=True,
+        sdist_url={"2.0": "https://x/pkg-2.0.tar.gz"}, get=boom,
+    )
+    assert results[0].verdict == CHECK_FAILED
+    assert "network down" in results[0].detail
+    assert has_problems(results)
 
 
 def test_limit_selects_newest():
